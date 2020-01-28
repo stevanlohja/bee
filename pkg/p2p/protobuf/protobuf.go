@@ -5,10 +5,12 @@
 package protobuf
 
 import (
+	"fmt"
+	"io"
+
 	"github.com/ethersphere/bee/pkg/p2p"
 	ggio "github.com/gogo/protobuf/io"
 	"github.com/gogo/protobuf/proto"
-	"io"
 )
 
 const delimitedReaderMaxSize = 128 * 1024 // max message size
@@ -42,4 +44,28 @@ func ReadMessages(r io.Reader, newMessage func() Message) (m []Message, err erro
 		m = append(m, msg)
 	}
 	return m, nil
+}
+
+func Request(w ggio.Writer, r ggio.Reader, req, resp Message) error {
+	if err := w.WriteMsg(req); err != nil {
+		return fmt.Errorf("write message: %w", err)
+	}
+	if err := r.ReadMsg(resp); err != nil {
+		return fmt.Errorf("read message: %w", err)
+	}
+	return nil
+}
+
+func Respond(w ggio.Writer, r ggio.Reader, req Message, f func() (resp Message, err error)) error {
+	if err := r.ReadMsg(req); err != nil {
+		return fmt.Errorf("read message: %w", err)
+	}
+	resp, err := f()
+	if err != nil {
+		return err
+	}
+	if err := w.WriteMsg(resp); err != nil {
+		return fmt.Errorf("write message: %w", err)
+	}
+	return nil
 }

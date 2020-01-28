@@ -68,24 +68,16 @@ func (s *Service) Ping(ctx context.Context, address string, msgs ...string) (rtt
 
 	w, r := protobuf.NewWriterAndReader(stream)
 
-	var pong pb.Pong
+	var resp pb.Pong
 	for _, msg := range msgs {
-		if err := w.WriteMsg(&pb.Ping{
+		err := protobuf.Request(w, r, &pb.Ping{
 			Greeting: msg,
-		}); err != nil {
-			return 0, fmt.Errorf("write message: %w", err)
+		}, &resp)
+		if err != nil {
+			return 0, err
 		}
+		s.logger.Debugf("pingpong: got pong: %q", resp.Response)
 		s.metrics.PingSentCount.Inc()
-
-		if err := r.ReadMsg(&pong); err != nil {
-			if err == io.EOF {
-				break
-			}
-			return 0, fmt.Errorf("read message: %w", err)
-		}
-
-		s.logger.Debugf("got pong: %q", pong.Response)
-		s.metrics.PongReceivedCount.Inc()
 	}
 	return time.Since(start), nil
 }
@@ -94,21 +86,19 @@ func (s *Service) Handler(peer p2p.Peer, stream p2p.Stream) error {
 	w, r := protobuf.NewWriterAndReader(stream)
 	defer stream.Close()
 
-	var ping pb.Ping
+	var req pb.Ping
 	for {
-		if err := r.ReadMsg(&ping); err != nil {
+		err := protobuf.Respond(w, r, &req, func() (resp protobuf.Message, err error) {
+			s.logger.Debugf("pingpong: got ping: %q", req.Greeting)
+			return &pb.Pong{
+				Response: "{" + req.Greeting + "}",
+			}, nil
+		})
+		if err != nil {
 			if err == io.EOF {
 				break
 			}
-			return fmt.Errorf("read message: %w", err)
-		}
-		s.logger.Debugf("got ping: %q", ping.Greeting)
-		s.metrics.PingReceivedCount.Inc()
-
-		if err := w.WriteMsg(&pb.Pong{
-			Response: "{" + ping.Greeting + "}",
-		}); err != nil {
-			return fmt.Errorf("write message: %w", err)
+			return err
 		}
 		s.metrics.PongSentCount.Inc()
 	}
