@@ -37,8 +37,8 @@ func (s *server) setupRouting() {
 
 	router.Handle("/debug/vars", expvar.Handler())
 
-	router.HandleFunc("/health", s.statusHandler)
-	router.HandleFunc("/readiness", s.statusHandler)
+	router.HandleFunc("/health", s.healthHandler)
+	router.HandleFunc("/readiness", s.readinessHandler)
 
 	router.Handle("/addresses", jsonhttp.MethodHandler{
 		"GET": http.HandlerFunc(s.addressesHandler),

@@ -40,4 +40,19 @@ clean:
 	$(GO) clean
 	rm -rf dist/
 
+check-swagger:
+	which swagger || (GO111MODULE=off go get -u github.com/go-swagger/go-swagger/cmd/swagger)
+
+swagger-api: check-swagger
+	swagger generate spec -w ./pkg/api -o ./docs/api/swagger.yaml --scan-models
+
+swagger-debugapi: check-swagger
+	swagger generate spec -w ./pkg/debugapi -o ./docs/debugapi/swagger.yaml --scan-models
+
+serve-swagger-api: check-swagger
+	swagger serve docs/api/swagger.yaml
+
+serve-swagger-debugapi: check-swagger
+	swagger serve docs/debugapi/swagger.yaml
+
 FORCE:

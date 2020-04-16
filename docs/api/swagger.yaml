@@ -1,0 +1,94 @@
+basePath: /
+info:
+  description: Documentation of Bee API.
+  title: Bee API.
+  version: 0.1.0
+paths:
+  /bzz-chunk/{addr}:
+    get:
+      description: Download chunk data with given address.
+      operationId: chunkGet
+      parameters:
+      - description: Hex-encoded peer overlay address
+        format: address
+        in: path
+        name: addr
+        required: true
+        type: string
+        x-go-name: Addr
+      produces:
+      - application/octet-stream
+      responses:
+        "200": {}
+        default:
+          $ref: '#/responses/statusResponse'
+      summary: Download chunk
+      tags:
+      - bzz-chunk
+    post:
+      consumes:
+      - application/octet-stream
+      description: Upload chunk data with a given address by sending raw data.
+      operationId: chunkUpload
+      parameters:
+      - description: Hex-encoded peer overlay address
+        format: address
+        in: path
+        name: addr
+        required: true
+        type: string
+        x-go-name: Addr
+      produces:
+      - application/json
+      responses:
+        "200":
+          $ref: '#/responses/statusResponse'
+        default:
+          $ref: '#/responses/statusResponse'
+      summary: Upload chunk
+      tags:
+      - bzz-chunk
+  /pingpong/{addr}:
+    post:
+      description: Measure round trip time to peer by exchanging P2P messages.
+      operationId: pingpong
+      parameters:
+      - description: Hex-encoded peer overlay address
+        format: address
+        in: path
+        name: addr
+        required: true
+        type: string
+        x-go-name: Addr
+      produces:
+      - application/json
+      responses:
+        "200":
+          $ref: '#/responses/pingpongResponse'
+        default:
+          $ref: '#/responses/statusResponse'
+      summary: Pingpong exchange
+      tags:
+      - pingpong
+responses:
+  pingpongResponse:
+    headers:
+      rtt:
+        description: Round trip time in time duration format.
+        example: 1.45s
+        type: string
+  statusResponse:
+    description: StatusResponse is a standardized error format for specific HTTP responses.
+    headers:
+      code:
+        description: Code field corresponds with HTTP status code.
+        format: int64
+        type: integer
+      message:
+        description: |-
+          Message field is a short description of that code or provides more
+          context about the reason for such response.
+        type: string
+schemes:
+- http
+swagger: "2.0"

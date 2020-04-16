@@ -12,11 +12,30 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
+// swagger:response addressesResponse
+//
+// Node addresses.
 type addressesResponse struct {
-	Overlay  swarm.Address         `json:"overlay"`
+	// Hex-encoded node overlay address.
+	// in: body
+	Overlay swarm.Address `json:"overlay"`
+	// A list of node's libp2p underlay multiaddresses.
+	// in: body
 	Underlay []multiaddr.Multiaddr `json:"underlay"`
 }
 
+// swagger:route GET /addresses p2p addresses
+//
+// Node addresses
+//
+// Returns overlay and underlay addresses of a running node.
+//
+// Produces:
+// - application/json
+//
+// Responses:
+//   200: addressesResponse
+//   default: statusResponse
 func (s *server) addressesHandler(w http.ResponseWriter, r *http.Request) {
 	underlay, err := s.P2P.Addresses()
 	if err != nil {

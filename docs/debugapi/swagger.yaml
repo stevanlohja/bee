@@ -1,0 +1,227 @@
+basePath: /
+definitions:
+  Multiaddr:
+    allOf:
+    - type: object
+    - type: object
+    - type: object
+    - type: object
+    - type: object
+    - type: object
+    - allOf:
+      - type: object
+      - type: object
+      - type: object
+      - type: object
+      - type: object
+      - type: object
+      description: |-
+        Multiaddrs have both a binary and string representation.
+
+        import ma "github.com/multiformats/go-multiaddr"
+
+        addr, err := ma.NewMultiaddr("/ip4/1.2.3.4/tcp/80")
+        err non-nil when parsing failed.
+      properties:
+        Bytes:
+          description: |-
+            Bytes returns the []byte representation of this Multiaddr
+
+            This function may expose immutable, internal state. Do not modify.
+          items:
+            format: uint8
+            type: integer
+          type: array
+        Protocols:
+          description: |-
+            Protocols returns the list of Protocols this Multiaddr includes
+            will panic if protocol code incorrect (and bytes accessed incorrectly)
+          items:
+            $ref: '#/definitions/Protocol'
+          type: array
+        String:
+          description: |-
+            String returns the string representation of this Multiaddr
+            (may panic if internal state is corrupted)
+          type: string
+      title: |-
+        Multiaddr is a cross-protocol, cross-platform format for representing
+        internet addresses. It emphasizes explicitness and self-description.
+        Learn more here: https://github.com/multiformats/multiaddr
+      type: object
+    description: |-
+      Multiaddrs have both a binary and string representation.
+
+      import ma "github.com/multiformats/go-multiaddr"
+
+      addr, err := ma.NewMultiaddr("/ip4/1.2.3.4/tcp/80")
+      err non-nil when parsing failed.
+    properties:
+      Bytes:
+        description: |-
+          Bytes returns the []byte representation of this Multiaddr
+
+          This function may expose immutable, internal state. Do not modify.
+        items:
+          format: uint8
+          type: integer
+        type: array
+      Protocols:
+        description: |-
+          Protocols returns the list of Protocols this Multiaddr includes
+          will panic if protocol code incorrect (and bytes accessed incorrectly)
+        items:
+          $ref: '#/definitions/Protocol'
+        type: array
+      String:
+        description: |-
+          String returns the string representation of this Multiaddr
+          (may panic if internal state is corrupted)
+        type: string
+    title: |-
+      Multiaddr is a cross-protocol, cross-platform format for representing
+      internet addresses. It emphasizes explicitness and self-description.
+      Learn more here: https://github.com/multiformats/multiaddr
+    type: object
+    x-go-package: github.com/multiformats/go-multiaddr
+  Peer:
+    properties:
+      address:
+        format: address
+        type: string
+        x-go-name: Address
+    title: Peer holds information about a Peer.
+    type: object
+    x-go-package: github.com/ethersphere/bee/pkg/p2p
+  Protocol:
+    properties:
+      Code:
+        description: Code is the protocol's multicodec (a normal, non-varint number).
+        format: int64
+        type: integer
+      Name:
+        description: |-
+          Name is the string representation of the protocol code. E.g., ip4,
+          ip6, tcp, udp, etc.
+        type: string
+      Path:
+        description: |-
+          Path indicates a path protocol (e.g., unix). When parsing multiaddr
+          strings, path protocols consume the remainder of the address instead
+          of stopping at the next forward slash.
+
+          Size must be LengthPrefixedVarSize.
+        type: boolean
+      Size:
+        description: |-
+          Size is the size of the argument to this protocol.
+
+          Size == 0 means this protocol takes no argument.
+          Size >  0 means this protocol takes a constant sized argument.
+          Size <  0 means this protocol takes a variable length, varint
+          prefixed argument.
+        format: int64
+        type: integer
+      Transcoder:
+        $ref: '#/definitions/Transcoder'
+      VCode:
+        description: VCode is a precomputed varint encoded version of Code.
+        items:
+          format: uint8
+          type: integer
+        type: array
+    title: Protocol is a Multiaddr protocol description structure.
+    type: object
+    x-go-package: github.com/multiformats/go-multiaddr
+  Transcoder:
+    type: object
+    x-go-package: github.com/multiformats/go-multiaddr
+info:
+  description: Documentation of Bee Debug API.
+  title: Bee Debug API.
+  version: 0.1.0
+paths:
+  /addresses:
+    get:
+      description: Returns overlay and underlay addresses of a running node.
+      operationId: addresses
+      produces:
+      - application/json
+      responses:
+        "200":
+          $ref: '#/responses/addressesResponse'
+        default:
+          $ref: '#/responses/statusResponse'
+      summary: Node addresses
+      tags:
+      - p2p
+  /health:
+    get:
+      description: Returns service status to be used by health check tools.
+      operationId: health
+      produces:
+      - application/json
+      responses:
+        "200":
+          $ref: '#/responses/nodeStatusResponse'
+        default:
+          $ref: '#/responses/statusResponse'
+      summary: Service health status
+      tags:
+      - status
+  /peers:
+    get:
+      description: Returns a list of peers that a node is connected to.
+      operationId: peers
+      produces:
+      - application/json
+      responses:
+        "200":
+          $ref: '#/responses/peersResponse'
+        default:
+          $ref: '#/responses/statusResponse'
+      summary: Connected peers
+      tags:
+      - p2p
+  /readiness:
+    get:
+      description: Returns service status to be used by readiness check tools.
+      operationId: readiness
+      produces:
+      - application/json
+      responses:
+        "200":
+          $ref: '#/responses/nodeStatusResponse'
+        default:
+          $ref: '#/responses/statusResponse'
+      summary: Service readiness status
+      tags:
+      - status
+responses:
+  addressesResponse:
+    schema:
+      items:
+        $ref: '#/definitions/Multiaddr'
+      type: array
+  nodeStatusResponse: {}
+  peerConnectResponse: {}
+  peersResponse:
+    schema:
+      items:
+        $ref: '#/definitions/Peer'
+      type: array
+  statusResponse:
+    description: StatusResponse is a standardized error format for specific HTTP responses.
+    headers:
+      code:
+        description: Code field corresponds with HTTP status code.
+        format: int64
+        type: integer
+      message:
+        description: |-
+          Message field is a short description of that code or provides more
+          context about the reason for such response.
+        type: string
+schemes:
+- http
+swagger: "2.0"

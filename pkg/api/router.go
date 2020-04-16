@@ -28,7 +28,7 @@ func (s *server) setupRouting() {
 		fmt.Fprintln(w, "User-agent: *\nDisallow: /")
 	})
 
-	router.Handle("/pingpong/{peer-id}", jsonhttp.MethodHandler{
+	router.Handle("/pingpong/{addr}", jsonhttp.MethodHandler{
 		"POST": http.HandlerFunc(s.pingpongHandler),
 	})
 

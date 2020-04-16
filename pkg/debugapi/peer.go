@@ -15,8 +15,12 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
+// swagger:response peerConnectResponse
+//
+// Connected peer information.
 type peerConnectResponse struct {
-	Address string `json:"address"`
+	// in: body
+	Address swarm.Address `json:"address"`
 }
 
 func (s *server) peerConnectHandler(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +55,7 @@ func (s *server) peerConnectHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonhttp.OK(w, peerConnectResponse{
-		Address: address.String(),
+		Address: address,
 	})
 }
 
@@ -78,10 +82,26 @@ func (s *server) peerDisconnectHandler(w http.ResponseWriter, r *http.Request) {
 	jsonhttp.OK(w, nil)
 }
 
+// swagger:response peersResponse
+//
+// P2P peers.
 type peersResponse struct {
+	// in: body
 	Peers []p2p.Peer `json:"peers"`
 }
 
+// swagger:route GET /peers p2p peers
+//
+// Connected peers
+//
+// Returns a list of peers that a node is connected to.
+//
+// Produces:
+// - application/json
+//
+// Responses:
+//   200: peersResponse
+//   default: statusResponse
 func (s *server) peersHandler(w http.ResponseWriter, r *http.Request) {
 	jsonhttp.OK(w, peersResponse{
 		Peers: s.P2P.Peers(),

@@ -19,6 +19,8 @@ const (
 
 // Address represents an address in Swarm metric space of
 // Node and Chunk addresses.
+//
+// swagger:strfmt address
 type Address struct {
 	b []byte
 }
@@ -85,6 +87,15 @@ func (a *Address) UnmarshalJSON(b []byte) (err error) {
 // MarshalJSON returns JSON-encoded representation of Address.
 func (a Address) MarshalJSON() ([]byte, error) {
 	return json.Marshal(a.String())
+}
+
+func (a *Address) UnmarshalText(b []byte) (err error) {
+	*a, err = ParseHexAddress(string(b))
+	return err
+}
+
+func (a Address) MarshalText() ([]byte, error) {
+	return []byte(a.String()), nil
 }
 
 // ZeroAddress is the address that has no value.
