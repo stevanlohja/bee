@@ -7,6 +7,7 @@ package pushsync
 import (
 	"context"
 	"fmt"
+	"io"
 	"runtime/debug"
 	"time"
 
@@ -82,33 +83,37 @@ func (ps *PushSync) Close() error {
 }
 
 func (ps *PushSync) handler(ctx context.Context, p p2p.Peer, stream p2p.Stream) error {
-	// handle chunk delivery from other node
-	//_, r := protobuf.NewWriterAndReader(stream)
-	//defer stream.Close()
+	// receive pushed chunk from other nodes
+	_, r := protobuf.NewWriterAndReader(stream)
+	defer stream.Close()
 
-	//var ch pb.Delivery
+	var ch pb.Delivery
+	if err := r.ReadMsg(&ch); err != nil {
+		if err == io.EOF {
+			return nil
+		}
+		ps.logger.Debugf("Error reading  message: %s", err.Error())
+		return err
+	}
 
-	//if err := r.ReadMsg(&ch); err != nil {
-	//if err == io.EOF {
-	//return nil
-	//}
-	//ps.logger.Debugf("Error reading  message: %s", err.Error())
-	//}
+	// create chunk and store it in the local store
+	chunk := swarm.NewChunk(swarm.NewAddress(ch.Address), ch.Data)
+	_, err := ps.storer.Put(ctx, storage.ModePutSync, chunk)
+	if err != nil {
+		return err
+	}
 
-	//// create chunk and store it in the local store
-	//chunk := swarm.NewChunk(swarm.NewAddress(ch.Data[:20]), ch.Data[20:])
-	//_, err := ps.storer.Put(ctx, storage.ModePutSync, chunk)
-	//if err != nil {
-	//return err
-	//}
+	// push this to your closest node too
+	closestPeer, err := ps.peerSuggester.SyncPeer(chunk.Address())
+	if err != nil {
+		ps.logger.Debugf("couldn't find closest peer", "addr", chunk.Address().String(), "err", err)
+		return err
+	}
+	if err := ps.sendChunkMsg(ctx, closestPeer, chunk); err != nil {
+		ps.metrics.SendChunkErrorCounter.Inc()
+		ps.logger.Errorf("error sending chunk", "addr", chunk.Address().String(), "err", err)
+	}
 
-	//// push this to your closest node too
-	//if err := ps.sendChunkMsg(ctx, chunk); err != nil {
-	//ps.metrics.SendChunkErrorCounter.Inc()
-	//ps.logger.Errorf("error sending chunk", "addr", chunk.Address().String(), "err", err)
-	//}
-
-	//return nil
 	return nil
 }
 
@@ -136,10 +141,17 @@ func (ps *PushSync) chunksWorker(ctx context.Context) {
 				break
 			}
 
+			fmt.Println(ch.Address().String())
+
 			chunksInBatch++
 			ps.metrics.SendChunkCounter.Inc()
 
-			if err := ps.sendChunkMsg(ctx, ch); err != nil {
+			closestPeer, err := ps.peerSuggester.SyncPeer(ch.Address())
+			if err != nil {
+				ps.logger.Errorf("couldn't find closest peer", "addr", ch.Address().String(), "err", err)
+				break
+			}
+			if err := ps.sendChunkMsg(ctx, closestPeer, ch); err != nil {
 				ps.metrics.SendChunkErrorCounter.Inc()
 				ps.logger.Errorf("error sending chunk", "addr", ch.Address().String(), "err", err)
 			}
@@ -180,15 +192,11 @@ func (ps *PushSync) chunksWorker(ctx context.Context) {
 }
 
 // sendChunkMsg sends chunks to their destination
-// by opening a stream to the closest peer
-func (ps *PushSync) sendChunkMsg(ctx context.Context, ch swarm.Chunk) error {
+// by opening a stream to the given peer
+func (ps *PushSync) sendChunkMsg(ctx context.Context, peer swarm.Address, ch swarm.Chunk) error {
 	startTimer := time.Now()
-	closestPeer, err := ps.peerSuggester.SyncPeer(ch.Address())
-	if err != nil {
-		return err
-	}
 
-	streamer, err := ps.streamer.NewStream(ctx, closestPeer, nil, ProtocolName, ProtocolVersion, StreamName)
+	streamer, err := ps.streamer.NewStream(ctx, peer, nil, ProtocolName, ProtocolVersion, StreamName)
 	if err != nil {
 		return fmt.Errorf("new stream: %w", err)
 	}

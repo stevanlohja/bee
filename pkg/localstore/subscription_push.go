@@ -77,6 +77,7 @@ func (db *DB) SubscribePush(ctx context.Context) (c <-chan swarm.Chunk, stop fun
 					select {
 					case chunks <- swarm.NewChunk(swarm.NewAddress(dataItem.Address), dataItem.Data).WithTagID(item.Tag):
 						count++
+						fmt.Println("++++++", count, swarm.NewAddress(dataItem.Address).String())
 						// set next iteration start item
 						// when its chunk is successfully sent to channel
 						sinceItem = &item
