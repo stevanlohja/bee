@@ -192,7 +192,6 @@ func TestReceiveChunkFromClosestPeer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-
 	// setup the stream recorder to record stream data
 	recorder := streamtest.New(
 		streamtest.WithMiddlewares(func(f p2p.HandlerFunc) p2p.HandlerFunc {

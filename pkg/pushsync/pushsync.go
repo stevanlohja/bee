@@ -7,8 +7,8 @@ package pushsync
 import (
 	"context"
 	"fmt"
+
 	"io"
-	"runtime/debug"
 	"time"
 
 	"github.com/ethersphere/bee/pkg/logging"
@@ -77,7 +77,6 @@ func (s *PushSync) Protocol() p2p.ProtocolSpec {
 }
 
 func (ps *PushSync) Close() error {
-	debug.PrintStack()
 	close(ps.quit)
 	return nil
 }
