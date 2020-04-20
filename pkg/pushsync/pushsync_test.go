@@ -80,7 +80,6 @@ func TestAddChunkToLocalStore(t *testing.T) {
 
 	// setup the stream recorder to record stream data
 	recorder := streamtest.New(
-		//streamtest.WithProtocols(server.Protocol()),
 		streamtest.WithMiddlewares(func(f p2p.HandlerFunc) p2p.HandlerFunc {
 			if runtime.GOOS == "windows" {
 				// windows has a bit lower time resolution
@@ -91,6 +90,7 @@ func TestAddChunkToLocalStore(t *testing.T) {
 			return f
 		}),
 	)
+
 	// instantiate a pushsync instance
 	ps := pushsync.New(pushsync.Options{
 		Streamer:   recorder,

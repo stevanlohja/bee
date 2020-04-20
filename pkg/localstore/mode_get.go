@@ -23,6 +23,7 @@ import (
 	"github.com/ethersphere/bee/pkg/shed"
 	"github.com/ethersphere/bee/pkg/storage"
 	"github.com/ethersphere/bee/pkg/swarm"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 // Get returns a chunk from the database. If the chunk is
@@ -123,7 +124,7 @@ func (db *DB) updateGC(item shed.Item) (err error) {
 	db.batchMu.Lock()
 	defer db.batchMu.Unlock()
 
-	batch := db.shed.GetBatch(true)
+	batch := new(leveldb.Batch) //	db.shed.GetBatch(true)
 
 	// update accessTimeStamp in retrieve, gc
 

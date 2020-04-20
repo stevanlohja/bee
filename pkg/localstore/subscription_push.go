@@ -69,7 +69,6 @@ func (db *DB) SubscribePush(ctx context.Context) (c <-chan swarm.Chunk, stop fun
 				var count int
 				err := db.pushIndex.Iterate(func(item shed.Item) (stop bool, err error) {
 					// get chunk data
-					panic(count)
 					dataItem, err := db.retrievalDataIndex.Get(item)
 					if err != nil {
 						return true, err

@@ -21,11 +21,11 @@ import (
 	"errors"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/ethersphere/bee/pkg/shed"
 	"github.com/ethersphere/bee/pkg/storage"
 	"github.com/ethersphere/bee/pkg/swarm"
 	"github.com/ethersphere/bee/pkg/tags"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 // Set updates database indexes for
@@ -51,7 +51,7 @@ func (db *DB) set(mode storage.ModeSet, addrs ...swarm.Address) (err error) {
 	db.batchMu.Lock()
 	defer db.batchMu.Unlock()
 
-	batch := db.shed.GetBatch(true)
+	batch := new(leveldb.Batch) //	db.shed.GetBatch(true)
 
 	// variables that provide information for operations
 	// to be done after write batch function successfully executes
@@ -74,9 +74,7 @@ func (db *DB) set(mode storage.ModeSet, addrs ...swarm.Address) (err error) {
 			triggerPullFeed[po] = struct{}{}
 		}
 		for po, id := range binIDs {
-			if err := db.binIDs.PutInBatch(batch, uint64(po), id); err != nil {
-				return err
-			}
+			db.binIDs.PutInBatch(batch, uint64(po), id)
 		}
 
 	case storage.ModeSetSyncPush, storage.ModeSetSyncPull:
@@ -134,7 +132,7 @@ func (db *DB) set(mode storage.ModeSet, addrs ...swarm.Address) (err error) {
 // setAccess sets the chunk access time by updating required indexes:
 //  - add to pull, insert to gc
 // Provided batch and binID map are updated.
-func (db *DB) setAccess(batch *badger.Txn, binIDs map[uint8]uint64, addr swarm.Address, po uint8) (gcSizeChange int64, err error) {
+func (db *DB) setAccess(batch *leveldb.Batch, binIDs map[uint8]uint64, addr swarm.Address, po uint8) (gcSizeChange int64, err error) {
 
 	item := addressToItem(addr)
 
@@ -199,7 +197,7 @@ func (db *DB) setAccess(batch *badger.Txn, binIDs map[uint8]uint64, addr swarm.A
 //   from push sync index
 // - update to gc index happens given item does not exist in pin index
 // Provided batch is updated.
-func (db *DB) setSync(batch *badger.Txn, addr swarm.Address, mode storage.ModeSet) (gcSizeChange int64, err error) {
+func (db *DB) setSync(batch *leveldb.Batch, addr swarm.Address, mode storage.ModeSet) (gcSizeChange int64, err error) {
 	item := addressToItem(addr)
 
 	// need to get access timestamp here as it is not
@@ -336,7 +334,7 @@ func (db *DB) setSync(batch *badger.Txn, addr swarm.Address, mode storage.ModeSe
 // setRemove removes the chunk by updating indexes:
 //  - delete from retrieve, pull, gc
 // Provided batch is updated.
-func (db *DB) setRemove(batch *badger.Txn, addr swarm.Address) (gcSizeChange int64, err error) {
+func (db *DB) setRemove(batch *leveldb.Batch, addr swarm.Address) (gcSizeChange int64, err error) {
 	item := addressToItem(addr)
 
 	// need to get access timestamp here as it is not
@@ -386,7 +384,7 @@ func (db *DB) setRemove(batch *badger.Txn, addr swarm.Address) (gcSizeChange int
 // setPin increments pin counter for the chunk by updating
 // pin index and sets the chunk to be excluded from garbage collection.
 // Provided batch is updated.
-func (db *DB) setPin(batch *badger.Txn, addr swarm.Address) (err error) {
+func (db *DB) setPin(batch *leveldb.Batch, addr swarm.Address) (err error) {
 	item := addressToItem(addr)
 
 	// Get the existing pin counter of the chunk
@@ -421,7 +419,7 @@ func (db *DB) setPin(batch *badger.Txn, addr swarm.Address) (err error) {
 
 // setUnpin decrements pin counter for the chunk by updating pin index.
 // Provided batch is updated.
-func (db *DB) setUnpin(batch *badger.Txn, addr swarm.Address) (err error) {
+func (db *DB) setUnpin(batch *leveldb.Batch, addr swarm.Address) (err error) {
 	item := addressToItem(addr)
 
 	// Get the existing pin counter of the chunk
