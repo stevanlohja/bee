@@ -7,7 +7,6 @@ package pushsync
 import (
 	"context"
 	"fmt"
-	"runtime/debug"
 	"time"
 
 	"github.com/ethersphere/bee/pkg/logging"
@@ -76,7 +75,6 @@ func (s *PushSync) Protocol() p2p.ProtocolSpec {
 }
 
 func (ps *PushSync) Close() error {
-	debug.PrintStack()
 	close(ps.quit)
 	return nil
 }
@@ -103,7 +101,7 @@ func (ps *PushSync) handler(ctx context.Context, p p2p.Peer, stream p2p.Stream) 
 	//}
 
 	//// push this to your closest node too
-	//if err := ps.sendChunkMsg(ctx, chunk); err != nil {
+	//if err := ps.sendChunkMsg(ctx, peer,chunk); err != nil {
 	//ps.metrics.SendChunkErrorCounter.Inc()
 	//ps.logger.Errorf("error sending chunk", "addr", chunk.Address().String(), "err", err)
 	//}

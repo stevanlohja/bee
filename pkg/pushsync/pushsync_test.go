@@ -145,74 +145,95 @@ func TestAddChunkToLocalStore(t *testing.T) {
 }
 
 func TestReceiveChunkFromClosestPeer(t *testing.T) {
-	//logger := logging.New(ioutil.Discard, 0)
-	//
-	//// received chunk
-	//chunkAddress := swarm.MustParseHexAddress("7000000000000000000000000000000000000000000000000000000000000000")
-	//
-	//// create a receiving node and a cluster of nodes
-	//receivingNode := swarm.MustParseHexAddress("0000000000000000000000000000000000000000000000000000000000000000") // base is 0000
-	//connectedPeers := []p2p.Peer{
-	//	{
-	//		Address: swarm.MustParseHexAddress("8000000000000000000000000000000000000000000000000000000000000000"), // binary 1000 -> po 0
-	//	},
-	//	{
-	//		Address: swarm.MustParseHexAddress("4000000000000000000000000000000000000000000000000000000000000000"), // binary 0100 -> po 1
-	//	},
-	//	{
-	//		Address: swarm.MustParseHexAddress("6000000000000000000000000000000000000000000000000000000000000000"), // binary 0110 -> po 1
-	//	},
-	//}
-	//
-	//// mock a connectivity between the nodes
-	//p2ps := p2pmock.New(p2pmock.WithConnectFunc(func(ctx context.Context, addr ma.Multiaddr) (swarm.Address, error) {
-	//	return receivingNode, nil
-	//}), p2pmock.WithPeersFunc(func() []p2p.Peer {
-	//	return connectedPeers
-	//}))
-	//
-	//// Create a full connectivity between the peers
-	//discovery := mock.NewDiscovery()
-	//statestore := mockstate.NewStateStore()
-	//ab := addressbook.New(statestore)
-	//fullDriver := full.New(discovery, ab, p2ps, logger, receivingNode)
-	//
-	//// instantiate a pushsync protocol
-	//server := pushsync.New(pushsync.Options{
-	//	Logger:     logger,
-	//	SyncPeerer: fullDriver,
-	//	Storer:     nil,
-	//})
-	//
-	//// setup the stream recorder to record stream data
-	//recorder := streamtest.New(
-	//	streamtest.WithProtocols(server.Protocol()),
-	//	streamtest.WithMiddlewares(func(f p2p.HandlerFunc) p2p.HandlerFunc {
-	//		if runtime.GOOS == "windows" {
-	//			// windows has a bit lower time resolution
-	//			// so, slow down the handler with a middleware
-	//			// not to get 0s for rtt value
-	//			time.Sleep(100 * time.Millisecond)
-	//		}
-	//		return f
-	//	}),
-	//)
-	//
-	//stream, err := recorder.NewStream(context.Background(), receivingNode, nil, pushsync.ProtocolName,
-	//	pushsync.ProtocolVersion, pushsync.StreamName)
-	//defer stream.Close()
-	//
-	//w, r := protobuf.NewWriterAndReader(stream)
-	//w.WriteMsg(&pb.Delivery{
-	//	Data: msg,
-	//})
-	//
+	logger := logging.New(ioutil.Discard, 0)
+
+	// chunk data to upload
+	chunkAddress := swarm.MustParseHexAddress("7000000000000000000000000000000000000000000000000000000000000000")
+	chunkData := []byte("1234")
+
+	// create a pivot node and a cluster of nodes
+	pivotNode := swarm.MustParseHexAddress("0000000000000000000000000000000000000000000000000000000000000000") // base is 0000
+	connectedPeers := []p2p.Peer{
+		{
+			Address: swarm.MustParseHexAddress("8000000000000000000000000000000000000000000000000000000000000000"), // binary 1000 -> po 0
+		},
+		{
+			Address: swarm.MustParseHexAddress("4000000000000000000000000000000000000000000000000000000000000000"), // binary 0100 -> po 1
+		},
+		{
+			Address: swarm.MustParseHexAddress("6000000000000000000000000000000000000000000000000000000000000000"), // binary 0110 -> po 1
+		},
+	}
+
+	// mock a connectivity between the nodes
+	p2ps := p2pmock.New(p2pmock.WithConnectFunc(func(ctx context.Context, addr ma.Multiaddr) (swarm.Address, error) {
+		return pivotNode, nil
+	}), p2pmock.WithPeersFunc(func() []p2p.Peer {
+		return connectedPeers
+	}))
+
+	// Create a full connectivity between the peers
+	discovery := mock.NewDiscovery()
+	statestore := mockstate.NewStateStore()
+	ab := addressbook.New(statestore)
+	fullDriver := full.New(discovery, ab, p2ps, logger, pivotNode)
+
+	// create a localstore
+	dir, err := ioutil.TempDir("", "localstore-stored-gc-size")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	//TODO: need to use memdb after merge with master
+	storer, err := localstore.New(dir, pivotNode.Bytes(), nil, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// setup the stream recorder to record stream data
+	recorder := streamtest.New(
+		streamtest.WithMiddlewares(func(f p2p.HandlerFunc) p2p.HandlerFunc {
+			if runtime.GOOS == "windows" {
+				// windows has a bit lower time resolution
+				// so, slow down the handler with a middleware
+				// not to get 0s for rtt value
+				time.Sleep(100 * time.Millisecond)
+			}
+			return f
+		}),
+	)
+
+	// instantiate a pushsync instance
+	ps := pushsync.New(pushsync.Options{
+		Streamer:   recorder,
+		Logger:     logger,
+		SyncPeerer: fullDriver,
+		Storer:     storer,
+	})
+	defer ps.Close()
+	recorder.SetProtocols(ps.Protocol())
+
+	receivingNode := swarm.MustParseHexAddress("0000000000000000000000000000000000000000000000000000000000000000") // base is 0000
+
+	stream, err := recorder.NewStream(context.Background(), receivingNode, nil, pushsync.ProtocolName,
+		pushsync.ProtocolVersion, pushsync.StreamName)
+	defer stream.Close()
+
+	w, _ := protobuf.NewWriterAndReader(stream)
+	w.WriteMsg(&pb.Delivery{
+		Address: chunkAddress.Bytes(),
+		Data:    chunkData,
+	})
+	// handler should be triggered after this
+	// check records for the appropriate message outbound to peer
+
 	//records, err := recorder.Records(connectedPeers[2].Address, "pushsync", "1.0.0", "pushsync")
 	//if err != nil {
-	//	t.Fatal(err)
+	//t.Fatal(err)
 	//}
 	//if l := len(records); l != 1 {
-	//	t.Fatalf("got %v records, want %v", l, 1)
+	//t.Fatalf("got %v records, want %v", l, 1)
 	//}
 	//record := records[0]
 }
