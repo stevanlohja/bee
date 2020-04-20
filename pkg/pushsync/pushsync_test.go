@@ -7,12 +7,13 @@ package pushsync_test
 import (
 	"bytes"
 	"context"
-	"github.com/ethersphere/bee/pkg/pushsync"
 	"io/ioutil"
 	"os"
 	"runtime"
 	"testing"
 	"time"
+
+	"github.com/ethersphere/bee/pkg/pushsync"
 
 	"github.com/ethersphere/bee/pkg/addressbook"
 	"github.com/ethersphere/bee/pkg/discovery/mock"
@@ -116,9 +117,7 @@ func TestAddChunkToLocalStore(t *testing.T) {
 	}
 	record := records[0]
 
-
 	chunk := swarm.NewChunk(swarm.NewAddress(record.In()[:20]), record.In()[20:])
-
 
 	if !bytes.Equal(chunk.Address().Bytes(), chunkAddress.Bytes()) {
 		t.Fatalf("chunk address mismatch")
@@ -127,8 +126,6 @@ func TestAddChunkToLocalStore(t *testing.T) {
 	if !bytes.Equal(chunk.Data(), chunkData) {
 		t.Fatalf("chunk data mismatch")
 	}
-
-
 
 	// also check if the chunks is not present in any other node
 }

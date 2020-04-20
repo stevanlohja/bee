@@ -29,20 +29,19 @@ type PushSync struct {
 	streamer      p2p.Streamer
 	storer        storage.Storer
 	peerSuggester topology.SyncPeerer
-	quit           chan struct{}
+	quit          chan struct{}
 
-	logger        logging.Logger
-	metrics       metrics
+	logger  logging.Logger
+	metrics metrics
 }
 
-
 type Options struct {
-	Streamer    p2p.Streamer
-	Storer      storage.Storer
-	SyncPeerer 	topology.SyncPeerer
+	Streamer   p2p.Streamer
+	Storer     storage.Storer
+	SyncPeerer topology.SyncPeerer
 
-	Logger      logging.Logger
-	metrics     metrics
+	Logger  logging.Logger
+	metrics metrics
 }
 
 var retryInterval = 10 * time.Second // time interval between retries
@@ -81,7 +80,6 @@ func (ps *PushSync) Close() {
 	ps.logger.Error("closing pusher")
 }
 
-
 func (ps *PushSync) handler(ctx context.Context, p p2p.Peer, stream p2p.Stream) error {
 
 	// will get a delivery of chunk... we should store it in storer
@@ -113,7 +111,6 @@ func (ps *PushSync) handler(ctx context.Context, p p2p.Peer, stream p2p.Stream) 
 
 	return nil
 }
-
 
 func (ps *PushSync) chunksWorker(ctx context.Context) {
 	var chunks <-chan swarm.Chunk
@@ -182,24 +179,23 @@ func (ps *PushSync) chunksWorker(ctx context.Context) {
 	}
 }
 
-
 // sendChunkMsg sends chunks to their destination
 // by opening a stream to the closest peer
 func (ps *PushSync) sendChunkMsg(ctx context.Context, ch swarm.Chunk) error {
 	startTimer := time.Now()
 	closestPeer, err := ps.peerSuggester.SyncPeer(ch.Address())
 	if err != nil {
-		ps.logger.Error("could not find peer to send chunks", "addr", ch.Address().String() , "err", err)
+		ps.logger.Error("could not find peer to send chunks", "addr", ch.Address().String(), "err", err)
 		return err
 	}
-	streamer, err := ps.streamer.NewStream(ctx , closestPeer, nil, ProtocolName, ProtocolVersion, StreamName)
+	streamer, err := ps.streamer.NewStream(ctx, closestPeer, nil, ProtocolName, ProtocolVersion, StreamName)
 	if err != nil {
 		return fmt.Errorf("new stream: %w", err)
 	}
 	defer streamer.Close()
 
 	w, _ := protobuf.NewWriterAndReader(streamer)
-	chunkData :=  make ([]byte, len(ch.Address().Bytes()) + len(ch.Data()))
+	chunkData := make([]byte, len(ch.Address().Bytes())+len(ch.Data()))
 	copy(chunkData[:], ch.Address().Bytes())
 	copy(chunkData[len(ch.Address().Bytes()):], ch.Data())
 

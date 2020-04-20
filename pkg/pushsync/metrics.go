@@ -14,15 +14,13 @@ type metrics struct {
 	// to be able to return them by Metrics()
 	// using reflection
 
-	SendChunkCounter         prometheus.Counter
-	SendChunkTimer			 prometheus.Counter
-	SendChunkErrorCounter    prometheus.Counter
-	MarkAndSweepTimer      prometheus.Counter
+	SendChunkCounter      prometheus.Counter
+	SendChunkTimer        prometheus.Counter
+	SendChunkErrorCounter prometheus.Counter
+	MarkAndSweepTimer     prometheus.Counter
 
-	ChunksInBatch           prometheus.Gauge
-
+	ChunksInBatch prometheus.Gauge
 }
-
 
 func newMetrics() metrics {
 	subsystem := "pushsync"
@@ -53,16 +51,12 @@ func newMetrics() metrics {
 			Help:      "Total time spent in mark and sweep.",
 		}),
 
-
-
-
 		ChunksInBatch: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: m.Namespace,
 			Subsystem: subsystem,
 			Name:      "chunks_in_batch",
 			Help:      "Chunks in batch at a given time.",
 		}),
-
 	}
 }
 
