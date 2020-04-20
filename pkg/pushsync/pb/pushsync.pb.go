@@ -23,7 +23,8 @@ var _ = math.Inf
 const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 type Delivery struct {
-	Data                 []byte   `protobuf:"bytes,1,opt,name=Data,proto3" json:"Data,omitempty"`
+	Address              []byte   `protobuf:"bytes,1,opt,name=Address,proto3" json:"Address,omitempty"`
+	Data                 []byte   `protobuf:"bytes,2,opt,name=Data,proto3" json:"Data,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -62,6 +63,13 @@ func (m *Delivery) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_Delivery proto.InternalMessageInfo
 
+func (m *Delivery) GetAddress() []byte {
+	if m != nil {
+		return m.Address
+	}
+	return nil
+}
+
 func (m *Delivery) GetData() []byte {
 	if m != nil {
 		return m.Data
@@ -76,14 +84,15 @@ func init() {
 func init() { proto.RegisterFile("pushsync.proto", fileDescriptor_723cf31bfc02bfd6) }
 
 var fileDescriptor_723cf31bfc02bfd6 = []byte{
-	// 97 bytes of a gzipped FileDescriptorProto
+	// 114 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x2b, 0x28, 0x2d, 0xce,
-	0x28, 0xae, 0xcc, 0x4b, 0xd6, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x2a, 0x48, 0x52, 0x92,
-	0xe3, 0xe2, 0x70, 0x49, 0xcd, 0xc9, 0x2c, 0x4b, 0x2d, 0xaa, 0x14, 0x12, 0xe2, 0x62, 0x71, 0x49,
-	0x2c, 0x49, 0x94, 0x60, 0x54, 0x60, 0xd4, 0xe0, 0x09, 0x02, 0xb3, 0x9d, 0x04, 0x4e, 0x3c, 0x92,
-	0x63, 0xbc, 0xf0, 0x48, 0x8e, 0xf1, 0xc1, 0x23, 0x39, 0xc6, 0x19, 0x8f, 0xe5, 0x18, 0x92, 0xd8,
-	0xc0, 0x9a, 0x8d, 0x01, 0x01, 0x00, 0x00, 0xff, 0xff, 0x4d, 0x26, 0xf8, 0x36, 0x4e, 0x00, 0x00,
-	0x00,
+	0x28, 0xae, 0xcc, 0x4b, 0xd6, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x2a, 0x48, 0x52, 0xb2,
+	0xe0, 0xe2, 0x70, 0x49, 0xcd, 0xc9, 0x2c, 0x4b, 0x2d, 0xaa, 0x14, 0x92, 0xe0, 0x62, 0x77, 0x4c,
+	0x49, 0x29, 0x4a, 0x2d, 0x2e, 0x96, 0x60, 0x54, 0x60, 0xd4, 0xe0, 0x09, 0x82, 0x71, 0x85, 0x84,
+	0xb8, 0x58, 0x5c, 0x12, 0x4b, 0x12, 0x25, 0x98, 0xc0, 0xc2, 0x60, 0xb6, 0x93, 0xc0, 0x89, 0x47,
+	0x72, 0x8c, 0x17, 0x1e, 0xc9, 0x31, 0x3e, 0x78, 0x24, 0xc7, 0x38, 0xe3, 0xb1, 0x1c, 0x43, 0x12,
+	0x1b, 0xd8, 0x58, 0x63, 0x40, 0x00, 0x00, 0x00, 0xff, 0xff, 0x3f, 0x80, 0xe2, 0x4e, 0x68, 0x00,
+	0x00, 0x00,
 }
 
 func (m *Delivery) Marshal() (dAtA []byte, err error) {
@@ -115,6 +124,13 @@ func (m *Delivery) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		copy(dAtA[i:], m.Data)
 		i = encodeVarintPushsync(dAtA, i, uint64(len(m.Data)))
 		i--
+		dAtA[i] = 0x12
+	}
+	if len(m.Address) > 0 {
+		i -= len(m.Address)
+		copy(dAtA[i:], m.Address)
+		i = encodeVarintPushsync(dAtA, i, uint64(len(m.Address)))
+		i--
 		dAtA[i] = 0xa
 	}
 	return len(dAtA) - i, nil
@@ -137,6 +153,10 @@ func (m *Delivery) Size() (n int) {
 	}
 	var l int
 	_ = l
+	l = len(m.Address)
+	if l > 0 {
+		n += 1 + l + sovPushsync(uint64(l))
+	}
 	l = len(m.Data)
 	if l > 0 {
 		n += 1 + l + sovPushsync(uint64(l))
@@ -183,6 +203,40 @@ func (m *Delivery) Unmarshal(dAtA []byte) error {
 		}
 		switch fieldNum {
 		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Address", wireType)
+			}
+			var byteLen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowPushsync
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				byteLen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if byteLen < 0 {
+				return ErrInvalidLengthPushsync
+			}
+			postIndex := iNdEx + byteLen
+			if postIndex < 0 {
+				return ErrInvalidLengthPushsync
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Address = append(m.Address[:0], dAtA[iNdEx:postIndex]...)
+			if m.Address == nil {
+				m.Address = []byte{}
+			}
+			iNdEx = postIndex
+		case 2:
 			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field Data", wireType)
 			}

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ethersphere/bee/pkg/pushsync"
+	"github.com/ethersphere/bee/pkg/pushsync/pb"
 
 	"github.com/ethersphere/bee/pkg/addressbook"
 	"github.com/ethersphere/bee/pkg/discovery/mock"
@@ -21,6 +22,7 @@ import (
 	"github.com/ethersphere/bee/pkg/logging"
 	"github.com/ethersphere/bee/pkg/p2p"
 	p2pmock "github.com/ethersphere/bee/pkg/p2p/mock"
+	"github.com/ethersphere/bee/pkg/p2p/protobuf"
 	"github.com/ethersphere/bee/pkg/p2p/streamtest"
 	mockstate "github.com/ethersphere/bee/pkg/statestore/mock"
 	"github.com/ethersphere/bee/pkg/storage"
@@ -76,22 +78,9 @@ func TestAddChunkToLocalStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// upload the chunk to the pivot node
-	_, err = storer.Put(context.Background(), storage.ModePutUpload, swarm.NewChunk(chunkAddress, chunkData))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// instantiate a pushsync protocol
-	server := pushsync.New(pushsync.Options{
-		Logger:     logger,
-		SyncPeerer: fullDriver,
-		Storer:     storer,
-	})
-
 	// setup the stream recorder to record stream data
 	recorder := streamtest.New(
-		streamtest.WithProtocols(server.Protocol()),
+		//streamtest.WithProtocols(server.Protocol()),
 		streamtest.WithMiddlewares(func(f p2p.HandlerFunc) p2p.HandlerFunc {
 			if runtime.GOOS == "windows" {
 				// windows has a bit lower time resolution
@@ -102,11 +91,27 @@ func TestAddChunkToLocalStore(t *testing.T) {
 			return f
 		}),
 	)
+	// instantiate a pushsync instance
+	ps := pushsync.New(pushsync.Options{
+		Streamer:   recorder,
+		Logger:     logger,
+		SyncPeerer: fullDriver,
+		Storer:     storer,
+	})
+	defer ps.Close()
+	recorder.SetProtocols(ps.Protocol())
+
+	// upload the chunk to the pivot node
+	_, err = storer.Put(context.Background(), storage.ModePutUpload, swarm.NewChunk(chunkAddress, chunkData))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	time.Sleep(time.Millisecond * 100)
 
 	// check if the chunk is there in the closest node
 	closestPeer := connectedPeers[2].Address
+
 	records, err := recorder.Records(closestPeer, pushsync.ProtocolName,
 		pushsync.ProtocolVersion, pushsync.StreamName)
 	if err != nil {
@@ -117,7 +122,18 @@ func TestAddChunkToLocalStore(t *testing.T) {
 	}
 	record := records[0]
 
-	chunk := swarm.NewChunk(swarm.NewAddress(record.In()[:20]), record.In()[20:])
+	messages, err := protobuf.ReadMessages(
+		bytes.NewReader(record.In()),
+		func() protobuf.Message { return new(pb.Delivery) },
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) > 1 {
+		t.Fatal("too many messages")
+	}
+	delivery := messages[0].(*pb.Delivery)
+	chunk := swarm.NewChunk(swarm.NewAddress(delivery.Address), delivery.Data)
 
 	if !bytes.Equal(chunk.Address().Bytes(), chunkAddress.Bytes()) {
 		t.Fatalf("chunk address mismatch")

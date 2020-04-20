@@ -52,6 +52,10 @@ func New(opts ...Option) *Recorder {
 	return r
 }
 
+func (r *Recorder) SetProtocols(protocols ...p2p.ProtocolSpec) {
+	r.protocols = append(r.protocols, protocols...)
+}
+
 func (r *Recorder) NewStream(ctx context.Context, addr swarm.Address, h p2p.Headers, protocolName, protocolVersion, streamName string) (p2p.Stream, error) {
 	recordIn := newRecord()
 	recordOut := newRecord()
@@ -109,6 +113,21 @@ func (r *Recorder) Records(addr swarm.Address, protocolName, protocolVersio, str
 		return nil, ErrRecordsNotFound
 	}
 	return records, nil
+}
+
+func (r *Recorder) AllRecords() ([]*Record, error) {
+	r.recordsMu.Lock()
+	defer r.recordsMu.Unlock()
+	vv := make([]*Record, 0)
+	for _, v := range r.records {
+		for _, vvv := range v {
+			vv = append(vv, vvv)
+		}
+		//if !ok {
+		//return nil, ErrRecordsNotFound
+		//}
+	}
+	return vv, nil
 }
 
 type Record struct {

@@ -7,6 +7,7 @@ package pushsync
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"time"
 
 	"github.com/ethersphere/bee/pkg/logging"
@@ -52,6 +53,7 @@ func New(o Options) *PushSync {
 		peerSuggester: o.SyncPeerer,
 		logger:        o.Logger,
 		metrics:       newMetrics(),
+		quit:          make(chan struct{}),
 	}
 
 	ctx := context.Background()
@@ -73,9 +75,10 @@ func (s *PushSync) Protocol() p2p.ProtocolSpec {
 	}
 }
 
-// Close closes the pusher
-func (ps *PushSync) Close() {
+func (ps *PushSync) Close() error {
+	debug.PrintStack()
 	close(ps.quit)
+	return nil
 }
 
 func (ps *PushSync) handler(ctx context.Context, p p2p.Peer, stream p2p.Stream) error {
@@ -122,7 +125,6 @@ func (ps *PushSync) chunksWorker(ctx context.Context) {
 		select {
 		// handle incoming chunks
 		case ch, more := <-chunks:
-			panic(0)
 			// if no more, set to nil, reset timer to 0 to finalise batch immediately
 			if !more {
 				chunks = nil
@@ -183,9 +185,9 @@ func (ps *PushSync) sendChunkMsg(ctx context.Context, ch swarm.Chunk) error {
 	startTimer := time.Now()
 	closestPeer, err := ps.peerSuggester.SyncPeer(ch.Address())
 	if err != nil {
-		ps.logger.Error("could not find peer to send chunks", "addr", ch.Address().String(), "err", err)
 		return err
 	}
+
 	streamer, err := ps.streamer.NewStream(ctx, closestPeer, nil, ProtocolName, ProtocolVersion, StreamName)
 	if err != nil {
 		return fmt.Errorf("new stream: %w", err)
@@ -193,17 +195,14 @@ func (ps *PushSync) sendChunkMsg(ctx context.Context, ch swarm.Chunk) error {
 	defer streamer.Close()
 
 	w, _ := protobuf.NewWriterAndReader(streamer)
-	chunkData := make([]byte, len(ch.Address().Bytes())+len(ch.Data()))
-	copy(chunkData[:], ch.Address().Bytes())
-	copy(chunkData[len(ch.Address().Bytes()):], ch.Data())
 
 	if err := w.WriteMsg(&pb.Delivery{
-		Data: chunkData,
+		Address: ch.Address().Bytes(),
+		Data:    ch.Data(),
 	}); err != nil {
 		return err
 	}
 
-	ps.logger.Trace("sent chunk", "addr", ch.Address().String())
 	timeSpent := float64(time.Since(startTimer))
 	ps.metrics.SendChunkTimer.Add(timeSpent)
 	return err

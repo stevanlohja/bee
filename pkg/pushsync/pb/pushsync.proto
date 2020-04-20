@@ -7,5 +7,6 @@ syntax = "proto3";
 package pb;
 
 message Delivery {
-  bytes Data = 1;
+  bytes Address = 1;
+  bytes Data = 2;
 }
