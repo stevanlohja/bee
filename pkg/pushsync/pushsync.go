@@ -7,7 +7,6 @@ package pushsync
 import (
 	"context"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/ethersphere/bee/pkg/logging"
@@ -77,38 +76,36 @@ func (s *PushSync) Protocol() p2p.ProtocolSpec {
 // Close closes the pusher
 func (ps *PushSync) Close() {
 	close(ps.quit)
-	ps.logger.Error("closing pusher")
 }
 
 func (ps *PushSync) handler(ctx context.Context, p p2p.Peer, stream p2p.Stream) error {
+	// handle chunk delivery from other node
+	//_, r := protobuf.NewWriterAndReader(stream)
+	//defer stream.Close()
 
-	// will get a delivery of chunk... we should store it in storer
+	//var ch pb.Delivery
 
-	_, r := protobuf.NewWriterAndReader(stream)
-	defer stream.Close()
+	//if err := r.ReadMsg(&ch); err != nil {
+	//if err == io.EOF {
+	//return nil
+	//}
+	//ps.logger.Debugf("Error reading  message: %s", err.Error())
+	//}
 
-	var ch pb.Delivery
+	//// create chunk and store it in the local store
+	//chunk := swarm.NewChunk(swarm.NewAddress(ch.Data[:20]), ch.Data[20:])
+	//_, err := ps.storer.Put(ctx, storage.ModePutSync, chunk)
+	//if err != nil {
+	//return err
+	//}
 
-	if err := r.ReadMsg(&ch); err != nil {
-		if err == io.EOF {
-			return nil
-		}
-		ps.logger.Debugf("Error reading  message: %s", err.Error())
-	}
+	//// push this to your closest node too
+	//if err := ps.sendChunkMsg(ctx, chunk); err != nil {
+	//ps.metrics.SendChunkErrorCounter.Inc()
+	//ps.logger.Errorf("error sending chunk", "addr", chunk.Address().String(), "err", err)
+	//}
 
-	// create chunk and store it in the local store
-	chunk := swarm.NewChunk(swarm.NewAddress(ch.Data[:20]), ch.Data[20:])
-	_, err := ps.storer.Put(ctx, storage.ModePutSync, chunk)
-	if err != nil {
-		return err
-	}
-
-	// push this to your closest node too
-	if err := ps.sendChunkMsg(ctx, chunk); err != nil {
-		ps.metrics.SendChunkErrorCounter.Inc()
-		ps.logger.Errorf("error sending chunk", "addr", chunk.Address().String(), "err", err)
-	}
-
+	//return nil
 	return nil
 }
 
@@ -125,6 +122,7 @@ func (ps *PushSync) chunksWorker(ctx context.Context) {
 		select {
 		// handle incoming chunks
 		case ch, more := <-chunks:
+			panic(0)
 			// if no more, set to nil, reset timer to 0 to finalise batch immediately
 			if !more {
 				chunks = nil

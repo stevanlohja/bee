@@ -76,6 +76,12 @@ func TestAddChunkToLocalStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// upload the chunk to the pivot node
+	_, err = storer.Put(context.Background(), storage.ModePutUpload, swarm.NewChunk(chunkAddress, chunkData))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// instantiate a pushsync protocol
 	server := pushsync.New(pushsync.Options{
 		Logger:     logger,
@@ -97,13 +103,7 @@ func TestAddChunkToLocalStore(t *testing.T) {
 		}),
 	)
 
-	// upload the chunk to the pivot node
-	_, err = storer.Put(context.Background(), storage.ModePutUpload, swarm.NewChunk(chunkAddress, chunkData))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Millisecond * 100)
 
 	// check if the chunk is there in the closest node
 	closestPeer := connectedPeers[2].Address
@@ -126,8 +126,6 @@ func TestAddChunkToLocalStore(t *testing.T) {
 	if !bytes.Equal(chunk.Data(), chunkData) {
 		t.Fatalf("chunk data mismatch")
 	}
-
-	// also check if the chunks is not present in any other node
 }
 
 func TestReceiveChunkFromClosestPeer(t *testing.T) {
