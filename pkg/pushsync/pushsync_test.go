@@ -7,7 +7,6 @@ package pushsync_test
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"runtime"
@@ -235,6 +234,17 @@ func TestReceiveChunkFromClosestPeer(t *testing.T) {
 		t.Fatalf("chunk %v not stored in DB", chunkAddress)
 	}
 
+	chunk, err := storer.Get(context.Background(), storage.ModeGetRequest, chunkAddress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(chunk.Address().Bytes(), chunkAddress.Bytes()) {
+		t.Fatalf("chunk address mismatch")
+	}
+	if !bytes.Equal(chunk.Data(), chunkData) {
+		t.Fatalf("chunk data mismatch")
+	}
+
 
 	records, err := recorder.Records(connectedPeers[2].Address, "pushsync", "1.0.0", "pushsync")
 	if err != nil {
@@ -243,6 +253,28 @@ func TestReceiveChunkFromClosestPeer(t *testing.T) {
 	if l := len(records); l != 1 {
 		t.Fatalf("got %v records, want %v", l, 1)
 	}
+	record := records[0]
 
-	fmt.Print(len(records))
+
+	messages, err := protobuf.ReadMessages(
+		bytes.NewReader(record.In()),
+		func() protobuf.Message { return new(pb.Delivery) },
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) > 1 {
+		t.Fatal("too many messages")
+	}
+	delivery := messages[0].(*pb.Delivery)
+	rcvdChunk := swarm.NewChunk(swarm.NewAddress(delivery.Address), delivery.Data)
+
+	if !bytes.Equal(rcvdChunk.Address().Bytes(), chunkAddress.Bytes()) {
+		t.Fatalf("chunk address mismatch")
+	}
+
+	if !bytes.Equal(rcvdChunk.Data(), chunkData) {
+		t.Fatalf("chunk data mismatch")
+	}
+
 }

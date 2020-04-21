@@ -140,8 +140,6 @@ func (ps *PushSync) chunksWorker(ctx context.Context) {
 				break
 			}
 
-			fmt.Println(ch.Address().String())
-
 			chunksInBatch++
 			ps.metrics.SendChunkCounter.Inc()
 
