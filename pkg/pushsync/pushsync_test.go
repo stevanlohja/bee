@@ -31,7 +31,7 @@ import (
 	ma "github.com/multiformats/go-multiaddr"
 )
 
-func TestAddChunkToLocalStore(t *testing.T) {
+func TestSendChunk(t *testing.T) {
 	logger := logging.New(ioutil.Discard, 0)
 
 	// chunk data to upload
@@ -140,7 +140,7 @@ func TestAddChunkToLocalStore(t *testing.T) {
 	}
 }
 
-func TestReceiveChunkFromClosestPeer(t *testing.T) {
+func TestForwardChunk(t *testing.T) {
 	logger := logging.New(ioutil.Discard, 0)
 
 	// chunk data to upload
