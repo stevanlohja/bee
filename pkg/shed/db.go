@@ -264,7 +264,9 @@ func (db *DB) Iterate(startKey []byte, skipStartKey bool, fn func(key []byte, va
 			return nil
 		}
 
-		if skipStartKey {
+		if skipStartKey &&  bytes.Equal(startKey, i.Item().Key()) {
+			//skip the startkey if it is enabled and if that is not
+			//matching the current key
 			i.Next()
 		}
 
