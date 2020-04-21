@@ -86,6 +86,8 @@ func (db *DB) set(mode storage.ModeSet, addrs ...swarm.Address) (err error) {
 			gcSizeChange += c
 		}
 
+		panic(gcSizeChange)
+
 	case storage.ModeSetRemove:
 		for _, addr := range addrs {
 			c, err := db.setRemove(batch, addr)

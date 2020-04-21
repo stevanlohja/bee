@@ -81,13 +81,10 @@ func TestAddChunkToLocalStore(t *testing.T) {
 	// setup the stream recorder to record stream data
 	recorder := streamtest.New(
 		streamtest.WithMiddlewares(func(f p2p.HandlerFunc) p2p.HandlerFunc {
-			if runtime.GOOS == "windows" {
-				// windows has a bit lower time resolution
-				// so, slow down the handler with a middleware
-				// not to get 0s for rtt value
-				time.Sleep(100 * time.Millisecond)
+			return func(context.Context, p2p.Peer, p2p.Stream) error {
+				// dont call any handlers
+				return nil
 			}
-			return f
 		}),
 	)
 
@@ -112,8 +109,7 @@ func TestAddChunkToLocalStore(t *testing.T) {
 	// check if the chunk is there in the closest node
 	closestPeer := connectedPeers[2].Address
 
-	records, err := recorder.Records(closestPeer, pushsync.ProtocolName,
-		pushsync.ProtocolVersion, pushsync.StreamName)
+	records, err := recorder.Records(closestPeer, pushsync.ProtocolName, pushsync.ProtocolVersion, pushsync.StreamName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +157,7 @@ func TestReceiveChunkFromClosestPeer(t *testing.T) {
 			Address: swarm.MustParseHexAddress("4000000000000000000000000000000000000000000000000000000000000000"), // binary 0100 -> po 1
 		},
 		{
-			Address: swarm.MustParseHexAddress("6000000000000000000000000000000000000000000000000000000000000000"), // binary 0110 -> po 1
+			Address: swarm.MustParseHexAddress("6000000000000000000000000000000000000000000000000000000000000000"), // binary 0110 -> po 1 want this one
 		},
 	}
 
@@ -191,9 +187,26 @@ func TestReceiveChunkFromClosestPeer(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	targetCalled := false
 	// setup the stream recorder to record stream data
 	recorder := streamtest.New(
 		streamtest.WithMiddlewares(func(f p2p.HandlerFunc) p2p.HandlerFunc {
+			return func(ctx context.Context, p p2p.Peer, s p2p.Stream) error {
+				if p.Address.Equal(connectedPeers[2].Address) {
+					if targetCalled {
+						t.Errorf("target called more than once")
+					}
+					targetCalled = true
+					return f(ctx, p, s)
+				} else if p.Address.Equal(pivotNode) {
+
+				}
+				return f(ctx, p, s)
+
+				//return nil
+			}
+			//return func(_ context.Context, p p2p.Peer, _ p2p.Stream) error {
+			//}
 			if runtime.GOOS == "windows" {
 				// windows has a bit lower time resolution
 				// so, slow down the handler with a middleware
@@ -214,26 +227,29 @@ func TestReceiveChunkFromClosestPeer(t *testing.T) {
 	defer ps.Close()
 	recorder.SetProtocols(ps.Protocol())
 
-	receivingNode := swarm.MustParseHexAddress("0000000000000000000000000000000000000000000000000000000000000000") // base is 0000
+	receivingNode := swarm.MustParseHexAddress("0090000000000000000000000000000000000000000000000000000000000000") // base is 0000
 
 	stream, err := recorder.NewStream(context.Background(), receivingNode, nil, pushsync.ProtocolName,
 		pushsync.ProtocolVersion, pushsync.StreamName)
 	defer stream.Close()
-
 	w, _ := protobuf.NewWriterAndReader(stream)
 	w.WriteMsg(&pb.Delivery{
 		Address: chunkAddress.Bytes(),
 		Data:    chunkData,
 	})
-	// handler should be triggered after this
-	// check records for the appropriate message outbound to peer
 
-	//records, err := recorder.Records(connectedPeers[2].Address, "pushsync", "1.0.0", "pushsync")
-	//if err != nil {
-	//t.Fatal(err)
-	//}
-	//if l := len(records); l != 1 {
-	//t.Fatalf("got %v records, want %v", l, 1)
-	//}
+	for i := 0; i < 20; i++ {
+		if !targetCalled {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	records, err := recorder.Records(connectedPeers[2].Address, "pushsync", "1.0.0", "pushsync")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l := len(records); l != 1 {
+		t.Fatalf("got %v records, want %v", l, 1)
+	}
 	//record := records[0]
 }
