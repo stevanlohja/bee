@@ -9,7 +9,6 @@ import (
 	"context"
 	"io/ioutil"
 	"os"
-	"runtime"
 	"testing"
 	"time"
 
@@ -148,7 +147,7 @@ func TestForwardChunk(t *testing.T) {
 	chunkData := []byte("1234")
 
 	// create a pivot node and a cluster of nodes
-	pivotNode := swarm.MustParseHexAddress("0000000000000000000000000000000000000000000000000000000000000000") // base is 0000
+	pivotNode := swarm.MustParseHexAddress("0000000000000000000000000000000000000000000000000000000000000000") // pivot is 0000
 	connectedPeers := []p2p.Peer{
 		{
 			Address: swarm.MustParseHexAddress("8000000000000000000000000000000000000000000000000000000000000000"), // binary 1000 -> po 0
@@ -168,11 +167,8 @@ func TestForwardChunk(t *testing.T) {
 		return connectedPeers
 	}))
 
-	// Create a full connectivity between the peers
-	discovery := mock.NewDiscovery()
-	statestore := mockstate.NewStateStore()
-	ab := addressbook.New(statestore)
-	fullDriver := full.New(discovery, ab, p2ps, logger, pivotNode)
+	// Create a full connectivity driver
+	fullDriver := full.New(mock.NewDiscovery(), addressbook.New(mockstate.NewStateStore()), p2ps, logger, pivotNode)
 
 	// create a localstore
 	dir, err := ioutil.TempDir("", "localstore-stored-gc-size")
@@ -188,36 +184,23 @@ func TestForwardChunk(t *testing.T) {
 	}
 
 	targetCalled := false
+
 	// setup the stream recorder to record stream data
 	recorder := streamtest.New(
 		streamtest.WithMiddlewares(func(f p2p.HandlerFunc) p2p.HandlerFunc {
 			return func(ctx context.Context, p p2p.Peer, s p2p.Stream) error {
 				if p.Address.Equal(connectedPeers[2].Address) {
 					if targetCalled {
-						t.Errorf("target called more than once")
+						t.Fatal("target called more than once")
 					}
 					targetCalled = true
-					return f(ctx, p, s)
-				} else if p.Address.Equal(pivotNode) {
-
+					return nil
 				}
 				return f(ctx, p, s)
-
-				//return nil
 			}
-			//return func(_ context.Context, p p2p.Peer, _ p2p.Stream) error {
-			//}
-			if runtime.GOOS == "windows" {
-				// windows has a bit lower time resolution
-				// so, slow down the handler with a middleware
-				// not to get 0s for rtt value
-				time.Sleep(100 * time.Millisecond)
-			}
-			return f
 		}),
 	)
 
-	// instantiate a pushsync instance
 	ps := pushsync.New(pushsync.Options{
 		Streamer:   recorder,
 		Logger:     logger,
@@ -225,14 +208,15 @@ func TestForwardChunk(t *testing.T) {
 		Storer:     storer,
 	})
 	defer ps.Close()
+
+	// TODO: this needs to go away once we have a simpler recorder
 	recorder.SetProtocols(ps.Protocol())
 
-	receivingNode := swarm.MustParseHexAddress("0090000000000000000000000000000000000000000000000000000000000000") // base is 0000
-
-	stream, err := recorder.NewStream(context.Background(), receivingNode, nil, pushsync.ProtocolName,
-		pushsync.ProtocolVersion, pushsync.StreamName)
+	stream, err := recorder.NewStream(context.Background(), pivotNode, nil, pushsync.ProtocolName, pushsync.ProtocolVersion, pushsync.StreamName)
 	defer stream.Close()
 	w, _ := protobuf.NewWriterAndReader(stream)
+
+	// this triggers the handler of the pivot with a delivery stream
 	w.WriteMsg(&pb.Delivery{
 		Address: chunkAddress.Bytes(),
 		Data:    chunkData,
@@ -244,12 +228,11 @@ func TestForwardChunk(t *testing.T) {
 		}
 	}
 
-	records, err := recorder.Records(connectedPeers[2].Address, "pushsync", "1.0.0", "pushsync")
+	records, err := recorder.Records(connectedPeers[2].Address, pushsync.ProtocolName, pushsync.ProtocolVersion, pushsync.StreamName)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if l := len(records); l != 1 {
 		t.Fatalf("got %v records, want %v", l, 1)
 	}
-	//record := records[0]
 }

@@ -7,8 +7,8 @@ package streamtest
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
-	"runtime/debug"
 	"sync"
 	"time"
 
@@ -22,7 +22,6 @@ var (
 	ErrStreamFullcloseTimeout = errors.New("fullclose timeout")
 	fullCloseTimeout          = fullCloseTimeoutDefault // timeout of fullclose
 	fullCloseTimeoutDefault   = 5 * time.Second         // default timeout used for helper function to reset timeout when changed
-	call                      = 0
 )
 
 type Recorder struct {
@@ -87,7 +86,6 @@ func (r *Recorder) NewStream(ctx context.Context, addr swarm.Address, h p2p.Head
 	if headler != nil {
 		streamOut.headers = headler(h)
 	}
-	call++
 	record := &Record{in: recordIn, out: recordOut}
 	go func() {
 		err := handler(ctx, p2p.Peer{Address: addr}, streamIn)
@@ -97,18 +95,17 @@ func (r *Recorder) NewStream(ctx context.Context, addr swarm.Address, h p2p.Head
 	}()
 
 	id := addr.String() + p2p.NewSwarmStreamName(protocolName, protocolVersion, streamName)
-
+	fmt.Println(id)
 	r.recordsMu.Lock()
 	defer r.recordsMu.Unlock()
 
 	r.records[id] = append(r.records[id], record)
-	debug.PrintStack()
 	return streamOut, nil
 }
 
 func (r *Recorder) Records(addr swarm.Address, protocolName, protocolVersio, streamName string) ([]*Record, error) {
 	id := addr.String() + p2p.NewSwarmStreamName(protocolName, protocolVersio, streamName)
-
+	fmt.Println(id)
 	r.recordsMu.Lock()
 	defer r.recordsMu.Unlock()
 

@@ -21,9 +21,9 @@ import (
 )
 
 const (
-	ProtocolName    = "pushsync"
-	ProtocolVersion = "1.0.0"
-	StreamName      = "puhsync"
+	protocolName    = "pushsync"
+	protocolVersion = "1.0.0"
+	streamName      = "pushsync"
 )
 
 type PushSync struct {
@@ -65,11 +65,11 @@ func New(o Options) *PushSync {
 
 func (s *PushSync) Protocol() p2p.ProtocolSpec {
 	return p2p.ProtocolSpec{
-		Name:    ProtocolName,
-		Version: ProtocolVersion,
+		Name:    protocolName,
+		Version: protocolVersion,
 		StreamSpecs: []p2p.StreamSpec{
 			{
-				Name:    StreamName,
+				Name:    streamName,
 				Handler: s.handler,
 			},
 		},
@@ -83,6 +83,7 @@ func (ps *PushSync) Close() error {
 
 func (ps *PushSync) handler(ctx context.Context, p p2p.Peer, stream p2p.Stream) error {
 	// handle chunk delivery from other node
+	fmt.Println("handler", p.Address.String())
 	_, r := protobuf.NewWriterAndReader(stream)
 	defer stream.Close()
 
@@ -203,7 +204,8 @@ func (ps *PushSync) chunksWorker(ctx context.Context) {
 // by opening a stream to the closest peer
 func (ps *PushSync) sendChunkMsg(ctx context.Context, peer swarm.Address, ch swarm.Chunk) error {
 	startTimer := time.Now()
-	streamer, err := ps.streamer.NewStream(ctx, peer, nil, ProtocolName, ProtocolVersion, StreamName)
+	fmt.Println("sendchunk", peer.String())
+	streamer, err := ps.streamer.NewStream(ctx, peer, nil, protocolName, protocolVersion, streamName)
 	if err != nil {
 		return fmt.Errorf("new stream: %w", err)
 	}
