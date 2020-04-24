@@ -6,7 +6,9 @@ package full
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -153,6 +155,20 @@ func (d *driver) ClosestPeer(addr swarm.Address) (swarm.Address, error) {
 	}
 
 	return closest, nil
+}
+
+func (d *driver) MarshalJSON() ([]byte, error) {
+	var peers []string
+	for _, p := range d.receivedPeers {
+		peers = append(peers, p.String())
+	}
+	return json.Marshal(struct {
+		Peers []string `json:"peers"`
+	}{Peers: peers})
+}
+
+func (d *driver) String() string {
+	return fmt.Sprintf("%s", d.receivedPeers)
 }
 
 func (d *driver) Close() error {

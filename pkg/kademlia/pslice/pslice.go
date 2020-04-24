@@ -95,6 +95,13 @@ func (s *PSlice) EachBinRev(pf topology.EachPeerFunc) error {
 	return nil
 }
 
+func (s *PSlice) Length() int {
+	s.Lock()
+	defer s.Unlock()
+
+	return len(s.peers)
+}
+
 // ShallowestEmpty returns the shallowest empty bin if one exists.
 // If such bin does not exists, returns true as bool value.
 func (s *PSlice) ShallowestEmpty() (bin uint8, none bool) {

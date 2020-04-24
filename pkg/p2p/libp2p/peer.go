@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethersphere/bee/pkg/p2p"
 	"github.com/ethersphere/bee/pkg/swarm"
+	"github.com/ethersphere/bee/pkg/topology"
 	"github.com/libp2p/go-libp2p-core/network"
 	libp2ppeer "github.com/libp2p/go-libp2p-core/peer"
 )
@@ -20,6 +21,8 @@ type peerRegistry struct {
 	overlays    map[libp2ppeer.ID]swarm.Address             // map underlay peer id to overlay address
 	connections map[libp2ppeer.ID]map[network.Conn]struct{} // list of connections for safe removal on Disconnect notification
 	mu          sync.RWMutex
+
+	topologyNotifiee topology.Notifiee
 
 	network.Notifiee // peerRegistry can be the receiver for network.Notify
 }

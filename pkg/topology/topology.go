@@ -21,13 +21,33 @@ type Driver interface {
 	io.Closer
 }
 
+type Notifiee interface {
+	Connecter
+	Disconnecter
+}
+
 type PeerAdder interface {
+	// AddPeer is called when a peer is added to the topology backlog
+	// for further processing by connectivity strategy.
 	AddPeer(ctx context.Context, addr swarm.Address) error
+}
+
+type Connecter interface {
+	//Connected is called when a peer dials in.
+	Connected(context.Context, swarm.Address)
+}
+
+type Disconnecter interface {
+	//Connected is called when a peer disconnects.
+	Disconnected(context.Context, swarm.Address)
 }
 
 type ClosestPeerer interface {
 	ClosestPeer(addr swarm.Address) (peerAddr swarm.Address, err error)
 }
+
+// ScoreFunc is implemented by components that need to score peers in a different way than XOR distance.
+type ScoreFunc func(peer swarm.Address) (score float32)
 
 // EachPeerFunc is a callback that is called with a peer and its PO
 type EachPeerFunc func(swarm.Address, uint8) (stop, jumpToNext bool, err error)
