@@ -14,9 +14,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
-
 	"github.com/ethersphere/bee/pkg/addressbook"
 	"github.com/ethersphere/bee/pkg/api"
 	"github.com/ethersphere/bee/pkg/crypto"
@@ -31,6 +28,8 @@ import (
 	"github.com/ethersphere/bee/pkg/netstore"
 	"github.com/ethersphere/bee/pkg/p2p/libp2p"
 	"github.com/ethersphere/bee/pkg/pingpong"
+	"github.com/ethersphere/bee/pkg/pusher"
+	"github.com/ethersphere/bee/pkg/pushsync"
 	"github.com/ethersphere/bee/pkg/retrieval"
 	"github.com/ethersphere/bee/pkg/statestore/leveldb"
 	mockinmem "github.com/ethersphere/bee/pkg/statestore/mock"
@@ -40,6 +39,8 @@ import (
 	"github.com/ethersphere/bee/pkg/tracing"
 	"github.com/ethersphere/bee/pkg/validator"
 	ma "github.com/multiformats/go-multiaddr"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 type Bee struct {
@@ -51,6 +52,7 @@ type Bee struct {
 	tracerCloser     io.Closer
 	stateStoreCloser io.Closer
 	localstoreCloser io.Closer
+	pusherCloser     io.Closer
 }
 
 type Options struct {
@@ -202,6 +204,21 @@ func NewBee(o Options) (*Bee, error) {
 	})
 
 	ns := netstore.New(storer, retrieve, validator.NewContentAddressValidator())
+
+	pushSyncProtocol := pushsync.New(pushsync.Options{
+		Streamer:      p2ps,
+		Storer:        storer,
+		ClosestPeerer: topologyDriver,
+		Logger:        logger,
+	})
+
+	pushSyncPusher := pusher.New(pusher.Options{
+		Storer:        storer,
+		PeerSuggester: topologyDriver,
+		PushSyncer:    pushSyncProtocol,
+		Logger:        logger,
+	})
+	b.pusherCloser = pushSyncPusher
 
 	var apiService api.Service
 	if o.APIAddr != "" {
@@ -365,6 +382,10 @@ func (b *Bee) Shutdown(ctx context.Context) error {
 	}
 	if err := eg.Wait(); err != nil {
 		return err
+	}
+
+	if err := b.pusherCloser.Close(); err != nil {
+		return fmt.Errorf("pusher: %w", err)
 	}
 
 	b.p2pCancel()
