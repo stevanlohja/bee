@@ -71,8 +71,7 @@ type Options struct {
 	Tracer         *tracing.Tracer
 }
 
-func New(ctx context.Context, signer beecrypto.Signer, networkID uint64, overlay swarm.Address, addr string,
-	o Options) (*Service, error) {
+func New(ctx context.Context, signer beecrypto.Signer, networkID uint64, overlay swarm.Address, addr string, o Options) (*Service, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, fmt.Errorf("address: %w", err)
@@ -348,7 +347,7 @@ func buildUnderlayAddress(addr ma.Multiaddr, peerID libp2ppeer.ID) (ma.Multiaddr
 	return addr.Encapsulate(hostAddr), nil
 }
 
-func (s *Service) Connect(ctx context.Context, addr ma.Multiaddr) (address *bzz.Address, err error) {
+func (s *Service) Connect(ctx context.Context, addr ma.Multiaddr, notify bool) (address *bzz.Address, err error) {
 	// Extract the peer ID from the multiaddr.
 	info, err := libp2ppeer.AddrInfoFromP2pAddr(addr)
 	if err != nil {
@@ -387,9 +386,22 @@ func (s *Service) Connect(ctx context.Context, addr ma.Multiaddr) (address *bzz.
 		return i.BzzAddress, nil
 	}
 
+	err = s.addressbook.Put(i.BzzAddress.Overlay, *i.BzzAddress)
+	if err != nil {
+		_ = s.disconnect(info.ID)
+		return nil, fmt.Errorf("storing bzz address: %w", err)
+	}
+
 	if err := helpers.FullClose(stream); err != nil {
 		_ = s.disconnect(info.ID)
 		return nil, fmt.Errorf("connect full close %w", err)
+	}
+
+	if notify && s.topologyNotifier != nil {
+		if err := s.topologyNotifier.Connected(ctx, i.BzzAddress.Overlay); err != nil {
+			_ = s.disconnect(info.ID)
+			return nil, fmt.Errorf("notify topology: %w", err)
+		}
 	}
 
 	s.metrics.CreatedConnectionCount.Inc()
