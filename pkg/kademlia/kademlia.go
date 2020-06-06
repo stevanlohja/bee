@@ -138,22 +138,11 @@ func (k *Kad) manage() {
 
 				err = k.connect(ctx, peer, bzzAddr.Underlay, po)
 				if err != nil {
-					k.logger.Errorf("error connecting to peer %s: %v", peer, err)
+					k.logger.Debugf("error connecting to peer from kademlia %s %+v: %v", peer, bzzAddr, err)
+					k.logger.Errorf("connecting to peer %s: %v", peer, err)
 					// continue to next
 					return false, false, nil
 				}
-
-				k.connectedPeers.Add(peer, po)
-
-				k.waitNextMu.Lock()
-				delete(k.waitNext, peer.String())
-				k.waitNextMu.Unlock()
-
-				k.depthMu.Lock()
-				k.depth = k.recalcDepth()
-				k.depthMu.Unlock()
-
-				k.logger.Debugf("connected to peer: %s old depth: %d new depth: %d", peer, currentDepth, k.NeighborhoodDepth())
 
 				select {
 				case <-k.quit:
@@ -250,7 +239,7 @@ func (k *Kad) connect(ctx context.Context, peer swarm.Address, ma ma.Multiaddr, 
 		return err
 	}
 
-	return k.announce(ctx, peer)
+	return nil
 }
 
 // announce a newly connected peer to our connected peers, but also
@@ -286,12 +275,9 @@ func (k *Kad) announce(ctx context.Context, peer swarm.Address) error {
 // This does not guarantee that a connection will immediately
 // be made to the peer.
 func (k *Kad) AddPeer(ctx context.Context, addr swarm.Address) error {
-	if k.knownPeers.Exists(addr) {
-		return nil
+	if _, err := k.addPeer(ctx, addr); err != nil {
+		return err
 	}
-
-	po := swarm.Proximity(k.base.Bytes(), addr.Bytes())
-	k.knownPeers.Add(addr, uint8(po))
 
 	select {
 	case k.manageC <- struct{}{}:
@@ -301,10 +287,23 @@ func (k *Kad) AddPeer(ctx context.Context, addr swarm.Address) error {
 	return nil
 }
 
-// Connected is called when a peer has dialed in.
-func (k *Kad) Connected(ctx context.Context, addr swarm.Address) error {
+func (k *Kad) addPeer(ctx context.Context, addr swarm.Address) (uint8, error) {
+	if k.knownPeers.Exists(addr) {
+		return 0, nil
+	}
+
 	po := uint8(swarm.Proximity(k.base.Bytes(), addr.Bytes()))
 	k.knownPeers.Add(addr, po)
+	return po, nil
+}
+
+// Connected is called when a peer has dialed in.
+func (k *Kad) Connected(ctx context.Context, addr swarm.Address) error {
+	po, err := k.addPeer(ctx, addr)
+	if err != nil {
+		return err
+	}
+
 	k.connectedPeers.Add(addr, po)
 
 	k.waitNextMu.Lock()
@@ -315,10 +314,6 @@ func (k *Kad) Connected(ctx context.Context, addr swarm.Address) error {
 	k.depth = k.recalcDepth()
 	k.depthMu.Unlock()
 
-	select {
-	case k.manageC <- struct{}{}:
-	default:
-	}
 	return k.announce(ctx, addr)
 }
 

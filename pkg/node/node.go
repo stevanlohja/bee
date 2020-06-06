@@ -37,6 +37,7 @@ import (
 	mockinmem "github.com/ethersphere/bee/pkg/statestore/mock"
 	"github.com/ethersphere/bee/pkg/storage"
 	"github.com/ethersphere/bee/pkg/swarm"
+	"github.com/ethersphere/bee/pkg/tags"
 	"github.com/ethersphere/bee/pkg/tracing"
 	"github.com/ethersphere/bee/pkg/validator"
 	ma "github.com/multiformats/go-multiaddr"
@@ -59,6 +60,7 @@ type Bee struct {
 
 type Options struct {
 	DataDir            string
+	DBCapacity         uint64
 	Password           string
 	APIAddr            string
 	DebugAPIAddr       string
@@ -191,8 +193,10 @@ func NewBee(o Options) (*Bee, error) {
 	if o.DataDir != "" {
 		path = filepath.Join(o.DataDir, "localstore")
 	}
-
-	storer, err = localstore.New(path, address.Bytes(), nil, logger)
+	lo := &localstore.Options{
+		Capacity: o.DBCapacity,
+	}
+	storer, err = localstore.New(path, address.Bytes(), lo, logger)
 	if err != nil {
 		return nil, fmt.Errorf("localstore: %w", err)
 	}
@@ -204,6 +208,7 @@ func NewBee(o Options) (*Bee, error) {
 		Storer:      storer,
 		Logger:      logger,
 	})
+	tag := tags.NewTags()
 
 	if err = p2ps.AddProtocol(retrieve.Protocol()); err != nil {
 		return nil, fmt.Errorf("retrieval service: %w", err)
@@ -226,6 +231,7 @@ func NewBee(o Options) (*Bee, error) {
 		Storer:        storer,
 		PeerSuggester: topologyDriver,
 		PushSyncer:    pushSyncProtocol,
+		Tags:          tag,
 		Logger:        logger,
 	})
 	b.pusherCloser = pushSyncPusher
@@ -235,6 +241,7 @@ func NewBee(o Options) (*Bee, error) {
 		// API server
 		apiService = api.New(api.Options{
 			Pingpong: pingPong,
+			Tags:     tag,
 			Storer:   ns,
 			Logger:   logger,
 			Tracer:   tracer,
