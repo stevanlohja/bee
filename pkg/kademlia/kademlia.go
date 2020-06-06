@@ -275,9 +275,12 @@ func (k *Kad) announce(ctx context.Context, peer swarm.Address) error {
 // This does not guarantee that a connection will immediately
 // be made to the peer.
 func (k *Kad) AddPeer(ctx context.Context, addr swarm.Address) error {
-	if _, err := k.addPeer(ctx, addr); err != nil {
-		return err
+	if k.knownPeers.Exists(addr) {
+		return nil
 	}
+
+	po := uint8(swarm.Proximity(k.base.Bytes(), addr.Bytes()))
+	k.knownPeers.Add(addr, po)
 
 	select {
 	case k.manageC <- struct{}{}:
@@ -287,23 +290,13 @@ func (k *Kad) AddPeer(ctx context.Context, addr swarm.Address) error {
 	return nil
 }
 
-func (k *Kad) addPeer(ctx context.Context, addr swarm.Address) (uint8, error) {
-	if k.knownPeers.Exists(addr) {
-		return 0, nil
-	}
-
-	po := uint8(swarm.Proximity(k.base.Bytes(), addr.Bytes()))
-	k.knownPeers.Add(addr, po)
-	return po, nil
-}
-
 // Connected is called when a peer has dialed in.
 func (k *Kad) Connected(ctx context.Context, addr swarm.Address) error {
-	po, err := k.addPeer(ctx, addr)
-	if err != nil {
+	if err := k.AddPeer(ctx, addr); err != nil {
 		return err
 	}
 
+	po := uint8(swarm.Proximity(k.base.Bytes(), addr.Bytes()))
 	k.connectedPeers.Add(addr, po)
 
 	k.waitNextMu.Lock()
