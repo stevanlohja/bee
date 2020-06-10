@@ -21,6 +21,10 @@ func NewMetadata(fileName string) *Metadata {
 	}
 }
 
+func (m *Metadata) SetMimeType(mineType string) {
+	m.MimeType = mineType
+}
+
 func (m *Metadata) String() string {
 	j, _ := json.Marshal(m)
 	return string(j)
