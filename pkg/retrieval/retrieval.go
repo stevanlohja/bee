@@ -76,14 +76,24 @@ const (
 )
 
 func (s *Service) RetrieveChunk(ctx context.Context, addr swarm.Address) (data []byte, err error) {
-	ctx, cancel := context.WithTimeout(ctx, maxPeers*retrieveChunkTimeout)
-	defer cancel()
-
+	var (
+		cancel                 context.CancelFunc
+		sourceAddr, forwarding = source(ctx)
+	)
 	v, err, _ := s.singleflight.Do(addr.String(), func() (v interface{}, err error) {
 		var skipPeers []swarm.Address
+		if !forwarding {
+			// give the enclosing context a higher timeout
+			ctx, cancel = context.WithTimeout(ctx, maxPeers*retrieveChunkTimeout)
+			defer cancel()
+		} else {
+			// skip source
+			skipPeers = append(skipPeers, sourceAddr)
+		}
+
 		for i := 0; i < maxPeers; i++ {
 			var peer swarm.Address
-			data, peer, err = s.retrieveChunk(ctx, addr, skipPeers)
+			data, peer, err = s.retrieveChunk(ctx, addr, skipPeers, forwarding)
 			if err != nil {
 				if peer.IsZero() {
 					return nil, err
@@ -103,21 +113,14 @@ func (s *Service) RetrieveChunk(ctx context.Context, addr swarm.Address) (data [
 	return v.([]byte), nil
 }
 
-func (s *Service) retrieveChunk(ctx context.Context, addr swarm.Address, skipPeers []swarm.Address) (data []byte, peer swarm.Address, err error) {
-	v := ctx.Value(requestSourceContextKey{})
-	if src, ok := v.(string); ok {
-		skipAddr, err := swarm.ParseHexAddress(src)
-		if err == nil {
-			skipPeers = append(skipPeers, skipAddr)
-		}
-	}
-	ctx, cancel := context.WithTimeout(ctx, retrieveChunkTimeout)
-	defer cancel()
-
-	peer, err = s.closestPeer(addr, skipPeers)
+func (s *Service) retrieveChunk(ctx context.Context, addr swarm.Address, skipPeers []swarm.Address, forwarding bool) (data []byte, peer swarm.Address, err error) {
+	peer, po, err = s.closestPeer(addr, skipPeers)
 	if err != nil {
 		return nil, peer, fmt.Errorf("get closest: %w", err)
 	}
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout(po))
+	defer cancel()
+
 	s.logger.Tracef("retrieval: requesting chunk %s from peer %s", addr, peer)
 	stream, err := s.streamer.NewStream(ctx, peer, nil, protocolName, protocolVersion, streamName)
 	if err != nil {
@@ -141,8 +144,9 @@ func (s *Service) retrieveChunk(ctx context.Context, addr swarm.Address, skipPee
 	return d.Data, peer, nil
 }
 
-func (s *Service) closestPeer(addr swarm.Address, skipPeers []swarm.Address) (swarm.Address, error) {
+func (s *Service) closestPeer(addr swarm.Address, skipPeers []swarm.Address) (swarm.Address, uint8, error) {
 	closest := swarm.Address{}
+	var foundPo uint8
 	err := s.peerSuggester.EachPeerRev(func(peer swarm.Address, po uint8) (bool, bool, error) {
 		for _, a := range skipPeers {
 			if a.Equal(peer) {
@@ -151,6 +155,7 @@ func (s *Service) closestPeer(addr swarm.Address, skipPeers []swarm.Address) (sw
 		}
 		if closest.IsZero() {
 			closest = peer
+			foundPo = po
 			return false, false, nil
 		}
 		dcmp, err := swarm.DistanceCmp(addr.Bytes(), closest.Bytes(), peer.Bytes())
@@ -163,6 +168,7 @@ func (s *Service) closestPeer(addr swarm.Address, skipPeers []swarm.Address) (sw
 		case -1:
 			// current peer is closer
 			closest = peer
+			foundPo = po
 		case 1:
 			// closest is already closer to chunk
 			// do nothing
@@ -170,15 +176,15 @@ func (s *Service) closestPeer(addr swarm.Address, skipPeers []swarm.Address) (sw
 		return false, false, nil
 	})
 	if err != nil {
-		return swarm.Address{}, err
+		return swarm.Address{}, 0, err
 	}
 
 	// check if found
 	if closest.IsZero() {
-		return swarm.Address{}, topology.ErrNotFound
+		return swarm.Address{}, 0, topology.ErrNotFound
 	}
 
-	return closest, nil
+	return closest, foundPo, nil
 }
 
 func (s *Service) handler(ctx context.Context, p p2p.Peer, stream p2p.Stream) error {
@@ -206,4 +212,22 @@ func (s *Service) handler(ctx context.Context, p p2p.Peer, stream p2p.Stream) er
 // SetStorer sets the storer. This call is not goroutine safe.
 func (s *Service) SetStorer(storer storage.Storer) {
 	s.storer = storer
+}
+
+// gets the request source address if it exists. boolean value signifies whether
+// the source address exists or not
+func source(ctx context.Context) (swarm.Address, bool) {
+	v := ctx.Value(requestSourceContextKey{})
+	if src, ok := v.(string); ok {
+		skipAddr, err := swarm.ParseHexAddress(src)
+		if err == nil {
+			return skipAddr, true
+		}
+	}
+	return swarm.ZeroAddress, false
+}
+
+func requestTimeout(po uint8) time.Duration {
+	v := (1 / (float32(po) * float32(maxPeers)))
+	return v * retrieveChunkTimeout
 }
